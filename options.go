@@ -127,11 +127,12 @@ func Hosts(hosts ...string) []string {
 	for _, v := range hosts {
 		if _, err := netip.ParseAddr(v); err == nil {
 			validHosts = append(validHosts, v)
+			continue
 		}
 
 		//посмотреть как красиво передать таймаут
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		ips, err := net.DefaultResolver.LookupIP(ctx, "", v)
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ip", v)
 		cancel()
 		if err != nil {
 			slog.Warn("Incorrect ip: " + v)
