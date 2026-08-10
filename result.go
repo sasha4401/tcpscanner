@@ -24,3 +24,22 @@ const (
 	StateCanceled
 	StateError
 )
+
+func (s State) String() string {
+	switch s {
+	case StateOpen:
+		return "open"
+	case StateClosed:
+		return "closed"
+	case StateTimeout:
+		return "timeout"
+	case StateUnreachable:
+		return "unreachable"
+	case StateCanceled:
+		return "canceled"
+	case StateError:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
