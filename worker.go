@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"sync"
-	"time"
 )
 
 var ErrPoolClosed = errors.New("pool is closed")
@@ -17,17 +16,17 @@ type pool struct {
 	stop    chan struct{}
 	done    chan struct{}
 
-	wg   sync.WaitGroup
-	once sync.Once
+	wg       sync.WaitGroup
+	once     sync.Once
+	closeRes sync.Once
 }
 
 type job struct {
-	host   string
-	ip     net.IP
-	port   uint16
-	ctx    context.Context
-	cancel context.CancelFunc
-	fn     func(ctx context.Context, host string, port uint16) Result
+	host string
+	ip   net.IP
+	port uint16
+	ctx  context.Context
+	fn   func(ctx context.Context, host string, port uint16) Result
 }
 
 func newPool(size int) *pool {
@@ -47,7 +46,7 @@ func newPool(size int) *pool {
 	return p
 }
 
-func (p *pool) Submit(ctx context.Context, host string, port uint16, fn func(ctx context.Context, host string, port uint16) Result, cancel context.CancelFunc) error {
+func (p *pool) Submit(ctx context.Context, host string, port uint16, fn func(ctx context.Context, host string, port uint16) Result) error {
 	select {
 	case <-p.stop:
 		return ErrPoolClosed
@@ -56,7 +55,7 @@ func (p *pool) Submit(ctx context.Context, host string, port uint16, fn func(ctx
 	default:
 	}
 
-	j := job{ctx: ctx, host: host, port: port, fn: fn, cancel: cancel}
+	j := job{ctx: ctx, host: host, port: port, fn: fn}
 	select {
 	case p.jobs <- j:
 		return nil
@@ -96,25 +95,6 @@ func (p *pool) drainAndExit() {
 }
 
 func (p *pool) runJob(j job) {
-	defer j.cancel()
-	if err := j.ctx.Err(); err != nil {
-		state := StateCanceled
-
-		if errors.Is(err, context.DeadlineExceeded) {
-			state = StateTimeout
-		}
-
-		p.sendRes(Result{
-			Host:     j.host,
-			IP:       j.ip,
-			Port:     j.port,
-			State:    state,
-			Duration: 0 * time.Second,
-			Err:      nil})
-
-		return
-	}
-
 	res := j.fn(j.ctx, j.host, j.port)
 	p.sendRes(res)
 }
@@ -132,6 +112,7 @@ func (p *pool) Shutdown(ctx context.Context) error {
 	drained := make(chan struct{})
 	go func() {
 		p.wg.Wait()
+		p.closeRes.Do(func() { close(p.results) })
 		close(drained)
 	}()
 
@@ -146,7 +127,10 @@ func (p *pool) Shutdown(ctx context.Context) error {
 }
 
 func (p *pool) sendRes(res Result) {
-	p.results <- res
+	select {
+	case p.results <- res:
+	case <-p.done:
+	}
 }
 
 func (p *pool) Results() <-chan Result {
