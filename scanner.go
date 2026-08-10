@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"strconv"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -20,34 +22,38 @@ func New(opts ...Option) (*Scanner, error) {
 		opt(s)
 	}
 
+	//добавить проверку на ошибки и корректные значения
+
 	return s, nil
 }
 
 func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Result, error) {
 	res := make([]Result, 0, len(hosts)*len(ran))
 	pool := newPool(s.Concurrency)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		for {
-			select {
-			case r := <-pool.Results():
-				res = append(res, r)
-			case <-ctx.Done():
-				ctxShutdown, cancelShut := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancelShut()
-
-				if err := pool.Shutdown(ctxShutdown); err != nil {
-					//шатдаун не успел завершиться
-				}
-
-				return
-			}
+		defer wg.Done()
+		for r := range pool.Results() {
+			res = append(res, r)
 		}
 	}()
+
+	shutdown := func() {
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = pool.Shutdown(shutCtx)
+		wg.Wait()
+	}
 
 	var checkPort = func(ctx context.Context, host string, port uint16) Result {
 		start := time.Now()
 		resSingle := Result{
 			Host: host, Port: port,
+		}
+
+		if ip := net.ParseIP(host); ip != nil {
+			resSingle.IP = ip
 		}
 
 		dialer := net.Dialer{
@@ -69,8 +75,12 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 				resSingle.State = StateTimeout
 			} else if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				resSingle.State = StateTimeout
-			} else {
+			} else if errors.Is(err, syscall.ECONNREFUSED) {
 				resSingle.State = StateClosed
+			} else if errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.EHOSTUNREACH) {
+				resSingle.State = StateUnreachable
+			} else {
+				resSingle.State = StateError
 			}
 
 			resSingle.Err = err
@@ -79,9 +89,9 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 
 		defer conn.Close()
 
-		if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-			resSingle.IP = tcpAddr.IP
-		}
+		// if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		// 	resSingle.IP = tcpAddr.IP
+		// }
 
 		resSingle.State = StateOpen
 		return resSingle
@@ -89,17 +99,13 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 
 	for _, i := range hosts {
 		for _, p := range ran {
-			ctxJob, cancel := context.WithTimeout(ctx, s.Timeout)
-			if err := pool.Submit(ctxJob, i, p, checkPort, cancel); err != nil {
-				cancel()
-				return nil, err
+			if err := pool.Submit(ctx, i, p, checkPort); err != nil {
+				shutdown()
+				return res, err
 			}
 		}
 	}
 
-	if err := pool.Shutdown(ctx); err != nil {
-		return nil, err
-	}
-
+	shutdown()
 	return res, nil
 }

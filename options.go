@@ -35,6 +35,10 @@ func Range(f, l int) []uint16 {
 		f = 1
 	}
 
+	if f >= int(maxPort) {
+		return nil
+	}
+
 	if l >= int(maxPort) {
 		l = int(maxPort)
 	}
@@ -123,10 +127,15 @@ func Hosts(hosts ...string) []string {
 		return []string{}
 	}
 
+	seen := make(map[string]struct{})
 	validHosts := make([]string, 0, len(hosts))
 	for _, v := range hosts {
 		if _, err := netip.ParseAddr(v); err == nil {
-			validHosts = append(validHosts, v)
+			if _, ok := seen[v]; !ok {
+				validHosts = append(validHosts, v)
+				seen[v] = struct{}{}
+			}
+
 			continue
 		}
 
@@ -140,7 +149,12 @@ func Hosts(hosts ...string) []string {
 		}
 
 		for _, i := range ips {
-			validHosts = append(validHosts, i.String())
+			s := i.String()
+			if _, ok := seen[s]; !ok {
+				validHosts = append(validHosts, i.String())
+				seen[s] = struct{}{}
+			}
+
 		}
 	}
 
