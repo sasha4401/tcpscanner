@@ -3,7 +3,6 @@ package tcpscanner
 import (
 	"context"
 	"errors"
-	"net"
 	"sync"
 )
 
@@ -23,7 +22,6 @@ type pool struct {
 
 type job struct {
 	host string
-	ip   net.IP
 	port uint16
 	ctx  context.Context
 	fn   func(ctx context.Context, host string, port uint16) Result

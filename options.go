@@ -10,19 +10,19 @@ import (
 	"time"
 )
 
-var maxPort uint16 = ^uint16(0)
+const maxPort uint16 = ^uint16(0)
 
 type Option func(*Scanner)
 
 func WithConcurrency(n int) Option {
 	return func(s *Scanner) {
-		s.Concurrency = n
+		s.concurrency = n
 	}
 }
 
 func WithTimeout(n time.Duration) Option {
 	return func(s *Scanner) {
-		s.Timeout = n
+		s.timeout = n
 	}
 }
 
@@ -35,7 +35,7 @@ func Range(f, l int) []uint16 {
 		f = 1
 	}
 
-	if f >= int(maxPort) {
+	if f > int(maxPort) {
 		return nil
 	}
 

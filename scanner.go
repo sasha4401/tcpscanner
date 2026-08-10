@@ -11,17 +11,24 @@ import (
 )
 
 type Scanner struct {
-	Concurrency int
-	Timeout     time.Duration
+	concurrency int
+	timeout     time.Duration
 }
 
 func New(opts ...Option) (*Scanner, error) {
-	s := &Scanner{Concurrency: 100, Timeout: 500 * time.Microsecond}
+	s := &Scanner{concurrency: 100, timeout: 500 * time.Millisecond}
 
 	for _, opt := range opts {
 		opt(s)
 	}
 
+	if s.concurrency <= 0 {
+		return nil, errors.New("Concurrency must be >0")
+	}
+
+	if s.timeout <= 0 {
+		return nil, errors.New("Timeout must be >0")
+	}
 	//добавить проверку на ошибки и корректные значения
 
 	return s, nil
@@ -29,7 +36,7 @@ func New(opts ...Option) (*Scanner, error) {
 
 func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Result, error) {
 	res := make([]Result, 0, len(hosts)*len(ran))
-	pool := newPool(s.Concurrency)
+	pool := newPool(s.concurrency)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -57,7 +64,7 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 		}
 
 		dialer := net.Dialer{
-			Timeout: s.Timeout,
+			Timeout: s.timeout,
 		}
 
 		conn, err := dialer.DialContext(
