@@ -129,6 +129,7 @@ func Hosts(hosts ...string) []string {
 			validHosts = append(validHosts, v)
 		}
 
+		//посмотреть как красиво передать таймаут
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		ips, err := net.DefaultResolver.LookupIP(ctx, "", v)
 		cancel()
