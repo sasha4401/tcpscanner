@@ -14,6 +14,11 @@ const maxPort uint16 = ^uint16(0)
 
 type Option func(*Scanner)
 
+type target struct {
+	host string
+	ip   string
+}
+
 func WithConcurrency(n int) Option {
 	return func(s *Scanner) {
 		s.concurrency = n
@@ -121,25 +126,24 @@ func List(ports ...string) []uint16 {
 	return validPorts
 }
 
-func Hosts(hosts ...string) []string {
+func Hosts(hosts ...string) []target {
 	if len(hosts) == 0 {
 		slog.Warn("Hosts list is Empty")
-		return []string{}
+		return []target{}
 	}
 
 	seen := make(map[string]struct{})
-	validHosts := make([]string, 0, len(hosts))
+	validHosts := make([]target, 0, len(hosts))
 	for _, v := range hosts {
 		if _, err := netip.ParseAddr(v); err == nil {
-			if _, ok := seen[v]; !ok {
-				validHosts = append(validHosts, v)
-				seen[v] = struct{}{}
+			if _, ok := seen[v+"\x00"+v]; !ok {
+				validHosts = append(validHosts, target{host: v, ip: v})
+				seen[v+"\x00"+v] = struct{}{}
 			}
 
 			continue
 		}
 
-		//посмотреть как красиво передать таймаут
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		ips, err := net.DefaultResolver.LookupIP(ctx, "ip", v)
 		cancel()
@@ -150,9 +154,9 @@ func Hosts(hosts ...string) []string {
 
 		for _, i := range ips {
 			s := i.String()
-			if _, ok := seen[s]; !ok {
-				validHosts = append(validHosts, i.String())
-				seen[s] = struct{}{}
+			if _, ok := seen[v+"\x00"+s]; !ok {
+				validHosts = append(validHosts, target{host: v, ip: i.String()})
+				seen[v+"\x00"+s] = struct{}{}
 			}
 
 		}

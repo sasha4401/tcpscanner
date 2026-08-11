@@ -24,7 +24,8 @@ type job struct {
 	host string
 	port uint16
 	ctx  context.Context
-	fn   func(ctx context.Context, host string, port uint16) Result
+	ip   string
+	fn   func(ctx context.Context, host string, port uint16, ip string) Result
 }
 
 func newPool(size int) *pool {
@@ -44,7 +45,7 @@ func newPool(size int) *pool {
 	return p
 }
 
-func (p *pool) submit(ctx context.Context, host string, port uint16, fn func(ctx context.Context, host string, port uint16) Result) error {
+func (p *pool) submit(ctx context.Context, host string, port uint16, ip string, fn func(ctx context.Context, host string, port uint16, ip string) Result) error {
 	select {
 	case <-p.stop:
 		return ErrPoolClosed
@@ -53,7 +54,7 @@ func (p *pool) submit(ctx context.Context, host string, port uint16, fn func(ctx
 	default:
 	}
 
-	j := job{ctx: ctx, host: host, port: port, fn: fn}
+	j := job{ctx: ctx, host: host, port: port, fn: fn, ip: ip}
 	select {
 	case p.jobs <- j:
 		return nil
@@ -93,7 +94,7 @@ func (p *pool) drainAndExit() {
 }
 
 func (p *pool) runJob(j job) {
-	res := j.fn(j.ctx, j.host, j.port)
+	res := j.fn(j.ctx, j.host, j.port, j.ip)
 	p.sendRes(res)
 }
 

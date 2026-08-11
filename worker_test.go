@@ -17,7 +17,7 @@ func TestPool_Concurrency(t *testing.T) {
 	var running atomic.Int32
 	var maxRunning atomic.Int32
 
-	fn := func(ctx context.Context, host string, port uint16) Result {
+	fn := func(ctx context.Context, host string, port uint16, ip string) Result {
 		current := running.Add(1)
 
 		for {
@@ -43,6 +43,7 @@ func TestPool_Concurrency(t *testing.T) {
 			context.Background(),
 			"localhost",
 			uint16(i+1),
+			"127.0.0.1",
 			fn,
 		); err != nil {
 			t.Fatal(err)
@@ -74,7 +75,8 @@ func TestPool_SubmitAndResult(t *testing.T) {
 		context.Background(),
 		"localhost",
 		80,
-		func(ctx context.Context, host string, port uint16) Result {
+		"127.0.0.1",
+		func(ctx context.Context, host string, port uint16, ip string) Result {
 			return Result{
 				Host:  host,
 				Port:  port,
@@ -136,7 +138,8 @@ func TestPool_MultipleJobs(t *testing.T) {
 			context.Background(),
 			"localhost",
 			uint16(i+1),
-			func(ctx context.Context, host string, port uint16) Result {
+			"127.0.0.1",
+			func(ctx context.Context, host string, port uint16, ip string) Result {
 				return Result{
 					Host:  host,
 					Port:  port,
@@ -189,7 +192,8 @@ func TestPool_SlowResultReader(t *testing.T) {
 				context.Background(),
 				"localhost",
 				uint16(i+1),
-				func(ctx context.Context, host string, port uint16) Result {
+				"127.0.0.1",
+				func(ctx context.Context, host string, port uint16, ip string) Result {
 					return Result{
 						Host:  host,
 						Port:  port,
