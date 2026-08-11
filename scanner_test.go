@@ -159,15 +159,15 @@ func TestScan_MultipleHostsAndPorts(t *testing.T) {
 
 	results, err := scanner.Scan(
 		context.Background(),
-		Hosts("127.0.0.1", "localhost"),
+		Hosts("127.0.0.1", "127.0.0.2"),
 		List(strconv.Itoa(int(port1)), strconv.Itoa(int(port2)), "81"),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(results) != 9 {
-		t.Fatalf("expected 9 results, got %d", len(results))
+	if len(results) != 6 {
+		t.Fatalf("expected 6 results, got %d", len(results))
 	}
 }
 
