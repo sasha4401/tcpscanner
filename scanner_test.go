@@ -166,8 +166,8 @@ func TestScan_MultipleHostsAndPorts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(results) != 6 {
-		t.Fatalf("expected 6 results, got %d", len(results))
+	if len(results) != 9 {
+		t.Fatalf("expected 9 results, got %d", len(results))
 	}
 }
 
