@@ -12,6 +12,12 @@ Worker pool для ограничения количества подключе�
 Состояния: open, closed, timeout, unreachable, canceled, error.
 Структурированный результат с IP, портом, состоянием, временем и ошибкой.
 
+# Установка
+
+```bash
+go get github.com/sasha4401/tcpscanner
+```
+
 # Использование
 
 ```go
