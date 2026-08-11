@@ -6,7 +6,6 @@ import (
 	"net"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -40,7 +39,7 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for r := range pool.Results() {
+		for r := range pool.readResults() {
 			res = append(res, r)
 		}
 	}()
@@ -48,7 +47,7 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 	shutdown := func() {
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = pool.Shutdown(shutCtx)
+		_ = pool.shutdown(shutCtx)
 		wg.Wait()
 	}
 
@@ -75,20 +74,7 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 		resSingle.Duration = time.Since(start)
 
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				resSingle.State = StateCanceled
-			} else if errors.Is(err, context.DeadlineExceeded) {
-				resSingle.State = StateTimeout
-			} else if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				resSingle.State = StateTimeout
-			} else if errors.Is(err, syscall.ECONNREFUSED) {
-				resSingle.State = StateClosed
-			} else if errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.EHOSTUNREACH) {
-				resSingle.State = StateUnreachable
-			} else {
-				resSingle.State = StateError
-			}
-
+			resSingle.State = classifyError(err)
 			resSingle.Err = err
 			return resSingle
 		}
@@ -105,7 +91,7 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 
 	for _, i := range hosts {
 		for _, p := range ran {
-			if err := pool.Submit(ctx, i, p, checkPort); err != nil {
+			if err := pool.submit(ctx, i, p, checkPort); err != nil {
 				shutdown()
 				return res, err
 			}

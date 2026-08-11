@@ -44,7 +44,7 @@ func newPool(size int) *pool {
 	return p
 }
 
-func (p *pool) Submit(ctx context.Context, host string, port uint16, fn func(ctx context.Context, host string, port uint16) Result) error {
+func (p *pool) submit(ctx context.Context, host string, port uint16, fn func(ctx context.Context, host string, port uint16) Result) error {
 	select {
 	case <-p.stop:
 		return ErrPoolClosed
@@ -97,7 +97,7 @@ func (p *pool) runJob(j job) {
 	p.sendRes(res)
 }
 
-func (p *pool) Shutdown(ctx context.Context) error {
+func (p *pool) shutdown(ctx context.Context) error {
 	called := false
 	p.once.Do(func() {
 		called = true
@@ -131,6 +131,6 @@ func (p *pool) sendRes(res Result) {
 	}
 }
 
-func (p *pool) Results() <-chan Result {
+func (p *pool) readResults() <-chan Result {
 	return p.results
 }
