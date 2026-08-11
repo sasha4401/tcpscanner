@@ -29,7 +29,6 @@ func New(opts ...Option) (*Scanner, error) {
 	if s.timeout <= 0 {
 		return nil, errors.New("Timeout must be >0")
 	}
-	//добавить проверку на ошибки и корректные значения
 
 	return s, nil
 }
@@ -96,9 +95,9 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 
 		defer conn.Close()
 
-		// if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-		// 	resSingle.IP = tcpAddr.IP
-		// }
+		if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+			resSingle.IP = tcpAddr.IP
+		}
 
 		resSingle.State = StateOpen
 		return resSingle
