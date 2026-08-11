@@ -32,7 +32,7 @@ func New(opts ...Option) (*Scanner, error) {
 	return s, nil
 }
 
-func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Result, error) {
+func (s *Scanner) Scan(ctx context.Context, hosts []target, ran []uint16) ([]Result, error) {
 	res := make([]Result, 0, len(hosts)*len(ran))
 	pool := newPool(s.concurrency)
 	var wg sync.WaitGroup
@@ -51,13 +51,13 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 		wg.Wait()
 	}
 
-	var checkPort = func(ctx context.Context, host string, port uint16) Result {
+	var checkPort = func(ctx context.Context, host string, port uint16, ip string) Result {
 		start := time.Now()
 		resSingle := Result{
 			Host: host, Port: port,
 		}
 
-		if ip := net.ParseIP(host); ip != nil {
+		if ip := net.ParseIP(ip); ip != nil {
 			resSingle.IP = ip
 		}
 
@@ -68,7 +68,7 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 		conn, err := dialer.DialContext(
 			ctx,
 			"tcp",
-			net.JoinHostPort(host, strconv.Itoa(int(port))),
+			net.JoinHostPort(ip, strconv.Itoa(int(port))),
 		)
 
 		resSingle.Duration = time.Since(start)
@@ -89,9 +89,9 @@ func (s *Scanner) Scan(ctx context.Context, hosts []string, ran []uint16) ([]Res
 		return resSingle
 	}
 
-	for _, i := range hosts {
+	for _, h := range hosts {
 		for _, p := range ran {
-			if err := pool.submit(ctx, i, p, checkPort); err != nil {
+			if err := pool.submit(ctx, h.host, p, h.ip, checkPort); err != nil {
 				shutdown()
 				return res, err
 			}
