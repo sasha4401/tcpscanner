@@ -36,6 +36,10 @@ func Range(f, l int) []uint16 {
 		l, f = f, l
 	}
 
+	if l <= 0 {
+		return nil
+	}
+
 	if f <= 0 {
 		f = 1
 	}
